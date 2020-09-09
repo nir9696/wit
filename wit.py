@@ -2,7 +2,6 @@ from datetime import datetime
 from distutils.dir_util import copy_tree
 
 import filecmp
-import itertools
 import os
 
 from os import listdir
@@ -15,7 +14,6 @@ import sys
 import matplotlib.pyplot as plt
 import networkx as nx
 import pylab
-
 
 IMG_NAME_LENGTH = 40
 FUNC_ARG = 1
@@ -175,14 +173,7 @@ def get_commit_id_by_master(ref_file):
 
 def append_branch_name_to_references(file_path, name, commit_id):
     branch_section = '='.join([name, commit_id])
-    append_to_file_contents_in_path(file_path, '\n'+ branch_section, 'a')
-
-
-def join_path_parts(path_parts):
-    merge = path_parts[0]
-    for part in path_parts[1:]:
-        merge = os.path.join(merge, part)
-    return merge
+    append_to_file_contents_in_path(file_path, '\n' + branch_section, 'a')
 
 
 def is_head_on_activated_branch(ref_file, activated_file, branch_name):
@@ -196,14 +187,14 @@ def is_head_on_activated_branch(ref_file, activated_file, branch_name):
         return head == branch_commit_id and activated_branch == branch_name
 
 
-def walk_up(bottom, limit='.wit'):
+def walk_up(bottom):
     path_to_copy = []
     bottom = path.realpath(bottom)
     path_parts = split_path_to_parts(bottom)
     for i in reversed(range(len(path_parts))):
-        curr_path = join_path_parts(path_parts[:i + 1])
-        if path.exists(os.path.join(curr_path, limit)):
-            return os.path.join(curr_path, limit), path_to_copy
+        curr_path = os.path.join(*path_parts[:i + 1])
+        if path.exists(os.path.join(curr_path, '.wit')):
+            return os.path.join(curr_path, '.wit'), path_to_copy
         path_to_copy.insert(0, os.path.basename(curr_path))
     return
 
@@ -229,15 +220,15 @@ def get_files_in_dir(path):
 
 
 def get_rel_path_to_staging_area(path):
-    return path.split('staging_area')[-1].lstrip('\\')
+    return path.split('staging_area')[-1][1:]
 
 
 def get_rel_path_to_source_dir(source_dir_path, path):
-    return path.split(source_dir_path)[-1].lstrip('\\')
+    return path.split(source_dir_path)[-1][1:]
 
 
 def get_rel_path_to_commit_id(path, commit_id):
-    return path.split(commit_id)[-1].lstrip('\\')
+    return path.split(commit_id)[-1][1:]
 
 
 def get_changes_not_staged_for_commit(source_dir, staging_area):
@@ -246,7 +237,8 @@ def get_changes_not_staged_for_commit(source_dir, staging_area):
         for f in filenames:
             in_staging_area = os.path.join(staging_area, os.path.join(concat_to_rel_path, f))
             in_source_dir = os.path.join(source_dir, os.path.join(concat_to_rel_path, f))
-            if not filecmp.cmp(in_source_dir, in_staging_area) or not filecmp.cmp(in_source_dir, in_staging_area, shallow=False):
+            if not filecmp.cmp(in_source_dir, in_staging_area) or not filecmp.cmp(in_source_dir, in_staging_area,
+                                                                                  shallow=False):
                 yield os.path.abspath(in_staging_area)
 
 
@@ -263,7 +255,7 @@ def change_source_dir_from_last_commit_id(source_dir, commit_id_path, commit_id)
 
 
 def get_commits_list(img_path):
-    return [os.path.basename(f).rstrip('.txt') for f in listdir(img_path) if path.isfile(path.join(img_path, f))]
+    return [os.path.basename(f).replace('.txt', '') for f in listdir(img_path) if path.isfile(path.join(img_path, f))]
 
 
 def get_commit_id_by_branch_name(ref_file, name):
@@ -331,7 +323,7 @@ def bfs(wit_path, root):
 def find_wit_dir():
     wit_and_path_to_copy = walk_up(os.getcwd())
     if not wit_and_path_to_copy:
-        raise WitNotFoundInSuperDirsError(f"Can't find '.wit' directory for path '{os.getcwd()}'")
+        raise WitNotFoundInSuperDirsError
     return wit_and_path_to_copy[0]
 
 
@@ -350,7 +342,7 @@ def init():
 def add(input_path):
     wit_and_path_to_copy = walk_up(input_path)
     if not wit_and_path_to_copy:
-        raise WitNotFoundInSuperDirsError(f"Can't find '.wit' directory for path '{input_path}'")
+        raise WitNotFoundInSuperDirsError
     wit_path = wit_and_path_to_copy[0]
     path_to_copy = wit_and_path_to_copy[1]
     dest = os.path.join(wit_path, 'staging_area')
@@ -383,9 +375,12 @@ def commit(additional_parent=None, merge=False):
     active_branch = get_file_contents(activated_file)
     # branch_in_ref = get_branch_name_and_its_commit_id(ref_file)
     if not merge and not is_master_and_head_different(ref_file) and active_branch == 'master':
-        append_to_file_contents_in_path(ref_file, f'HEAD={rand_name}\nmaster={rand_name}\n{get_commits_section(ref_file)}', 'w')
+        append_to_file_contents_in_path(ref_file,
+                                        f'HEAD={rand_name}\nmaster={rand_name}\n{get_commits_section(ref_file)}', 'w')
     elif is_head_on_activated_branch(ref_file, activated_file) or merge:
-        append_to_file_contents_in_path(ref_file, f'HEAD={rand_name}\nmaster={get_commit_id_by_master(ref_file)}\n{get_commits_section_after_change_commit_of_branch(ref_file, active_branch, rand_name)}', 'w')
+        append_to_file_contents_in_path(ref_file,
+                                        f'HEAD={rand_name}\nmaster={get_commit_id_by_master(ref_file)}\n{get_commits_section_after_change_commit_of_branch(ref_file, active_branch, rand_name)}',
+                                        'w')
     else:
         append_to_file_contents_in_path(ref_file,
                                         f'HEAD={rand_name}\nmaster={get_commit_id_by_master(ref_file)}\n{get_commits_section(ref_file)}',
@@ -404,13 +399,15 @@ def get_status():
     source_dir = os.path.abspath(os.path.join(wit_path, '..'))
     for file in get_changes_not_staged_for_commit(source_dir, staging_area):
         changes_not_staged_for_commit.append(file)
-    files_in_source_dir = [get_rel_path_to_source_dir(source_dir, path) for path in get_files_in_dir(source_dir) if os.path.join('.wit', '') not in path]
+    files_in_source_dir = [get_rel_path_to_source_dir(source_dir, path) for path in get_files_in_dir(source_dir) if
+                           os.path.join('.wit', '') not in path]
     files_in_staging_area = [get_rel_path_to_staging_area(path) for path in get_files_in_dir(staging_area)]
     untracked_files = []
     for file in files_in_source_dir:
         if file not in files_in_staging_area:
             untracked_files.append(file)
-    return {'head': head, 'changes_to_be_committed': changes_to_be_committed, 'changes_not_staged_for_commit': changes_not_staged_for_commit, 'untracked_files': untracked_files}
+    return {'head': head, 'changes_to_be_committed': changes_to_be_committed,
+            'changes_not_staged_for_commit': changes_not_staged_for_commit, 'untracked_files': untracked_files}
 
 
 def status():
@@ -432,7 +429,7 @@ def checkout(commit_id):
     ref_file = os.path.join(wit_path, 'references.txt')
     stat = get_status()
     if len(stat.get('changes_to_be_committed')) or len(stat.get('changes_not_staged_for_commit')):
-        raise CheckoutFailedError("Checkout Failed - files are not prepared for checkout.")
+        raise CheckoutFailedError
     if commit_id == 'master':
         commit_id = get_commit_id_by_master(ref_file)
 
@@ -441,7 +438,7 @@ def checkout(commit_id):
         branch_name = commit_id
         commit_id = get_commit_id_by_branch_name(ref_file, branch_name)
         if not commit_id:
-            raise NoSuchBranchNameError("No such branch name.")
+            raise NoSuchBranchNameError
         activated_file = os.path.join(wit_path, 'activated.txt')
         append_to_file_contents_in_path(activated_file, branch_name, 'w')
 
@@ -462,7 +459,8 @@ def graph():
     edge_colors = ['black' for _ in G.edges()]
     node_colors = ['white'] + ['red' for i in range(1, len(G.nodes()))]
     pos = nx.spring_layout(G)
-    nx.draw(G, pos, node_color=node_colors, node_size=1000, edge_color=edge_colors, edge_cmap=plt.cm.Reds, with_labels=True)
+    nx.draw(G, pos, node_color=node_colors, node_size=1000, edge_color=edge_colors, edge_cmap=plt.cm.Reds,
+            with_labels=True)
     pylab.show()
 
 
@@ -499,24 +497,34 @@ def merge(name):
         if branch_commits_history[i] in head_commits_history:
             common_commit = branch_commits_history[i]
         i += 1
-    for path, commit_id in to_staging_real_and_rel_paths.keys():
-        merge_version_add(path, wit_path, commit_id)
+    for path_to_add, commit_id in to_staging_real_and_rel_paths.keys():
+        merge_version_add(path_to_add, wit_path, commit_id)
     commit(name_commit_id, True)
 
 
-if sys.argv[FUNC_ARG] == 'init':
-    init()
-if sys.argv[FUNC_ARG] == 'status':
-    status()
-if sys.argv[FUNC_ARG] == 'add' and len(sys.argv) == FUNC_WITH_PARAM_ARGS + 1:
-    add(sys.argv[FUNC_WITH_PARAM_ARGS])
-if sys.argv[FUNC_ARG] == 'commit' and len(sys.argv) == FUNC_WITH_PARAM_ARGS + 1:
-    commit()
-if sys.argv[FUNC_ARG] == 'checkout' and len(sys.argv) == FUNC_WITH_PARAM_ARGS + 1:
-    checkout(sys.argv[FUNC_WITH_PARAM_ARGS])
-if sys.argv[FUNC_ARG] == 'graph':
-    graph()
-if sys.argv[FUNC_ARG] == 'branch' and len(sys.argv) == FUNC_WITH_PARAM_ARGS + 1:
-    branch(sys.argv[FUNC_WITH_PARAM_ARGS])
-if sys.argv[FUNC_ARG] == 'merge' and len(sys.argv) == FUNC_WITH_PARAM_ARGS + 1:
-    merge(sys.argv[FUNC_WITH_PARAM_ARGS])
+try:
+    if sys.argv[FUNC_ARG] == 'init':
+        init()
+    if sys.argv[FUNC_ARG] == 'status':
+        status()
+    if sys.argv[FUNC_ARG] == 'add' and len(sys.argv) == FUNC_WITH_PARAM_ARGS + 1:
+        add(sys.argv[FUNC_WITH_PARAM_ARGS])
+    if sys.argv[FUNC_ARG] == 'commit' and len(sys.argv) == FUNC_WITH_PARAM_ARGS + 1:
+        commit()
+    if sys.argv[FUNC_ARG] == 'checkout' and len(sys.argv) == FUNC_WITH_PARAM_ARGS + 1:
+        checkout(sys.argv[FUNC_WITH_PARAM_ARGS])
+    if sys.argv[FUNC_ARG] == 'graph':
+        graph()
+    if sys.argv[FUNC_ARG] == 'branch' and len(sys.argv) == FUNC_WITH_PARAM_ARGS + 1:
+        branch(sys.argv[FUNC_WITH_PARAM_ARGS])
+    if sys.argv[FUNC_ARG] == 'merge' and len(sys.argv) == FUNC_WITH_PARAM_ARGS + 1:
+        merge(sys.argv[FUNC_WITH_PARAM_ARGS])
+except WitNotFoundInSuperDirsError:
+    if sys.argv[FUNC_ARG] == 'add':
+        print(f"Can't find '.wit' directory for path '{sys.argv[FUNC_WITH_PARAM_ARGS]}'")
+    else:
+        print(f"Can't find '.wit' directory for path '{os.getcwd()}'")
+except CheckoutFailedError:
+    print("Checkout Failed - files are not prepared for checkout.")
+except NoSuchBranchNameError:
+    print("No such branch name.")
